@@ -8,6 +8,16 @@ setup(
     packages=find_packages("src"),
     python_requires=">=3.9",
     install_requires=["cryptography>=41"],
-    extras_require={"images": ["Pillow>=9"], "test": ["pytest>=7", "Pillow>=9"]},
-    entry_points={"console_scripts": ["nrai=nrai.cli:main", "nrai-viewer=nrai.viewer:main"]},
+    extras_require={
+        "images": ["Pillow>=9"],
+        "test": ["pytest>=7", "Pillow>=9"],
+        "build-desktop": ["pyinstaller>=6"],
+    },
+    entry_points={
+        "console_scripts": [
+            "nrai=nrai.cli:main",
+            "nrai-viewer=nrai.viewer:main",
+            "nrai-desktop=nrai.desktop:main",
+        ]
+    },
 )
