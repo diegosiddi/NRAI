@@ -1,0 +1,32 @@
+name: desktop builds
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: NRAI-macOS
+          - os: windows-latest
+            artifact: NRAI-Windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install . pyinstaller
+      - run: python -m PyInstaller --noconfirm --clean --windowed --name NRAI --paths src nrai_desktop.py
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            dist/NRAI.app
+            dist/NRAI.exe
+          if-no-files-found: error
