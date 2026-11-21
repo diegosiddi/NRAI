@@ -25,3 +25,18 @@ def test_macos_registration_adds_nrai_document_type_once(tmp_path):
     assert info["UTExportedTypeDeclarations"][0]["UTTypeIdentifier"] == "com.diegosiddi.nrai"
     assert len(info["CFBundleDocumentTypes"]) == 1
     assert info["CFBundleDocumentTypes"][0]["LSItemContentTypes"] == ["com.diegosiddi.nrai"]
+
+
+def test_macos_registration_embeds_quicklook_extension(tmp_path):
+    bundle = tmp_path / "NRAI Viewer.app"
+    contents = bundle / "Contents"
+    contents.mkdir(parents=True)
+    (contents / "Info.plist").write_bytes(plistlib.dumps({"CFBundleName": "NRAI Viewer"}))
+    extension = tmp_path / "NRAIQuickLookExtension.appex"
+    extension.mkdir()
+    (extension / "extension-marker").write_text("test", encoding="utf-8")
+
+    MACOS_REGISTRATION.register_bundle(bundle, extension)
+
+    installed = bundle / "Contents" / "PlugIns" / extension.name
+    assert (installed / "extension-marker").read_text(encoding="utf-8") == "test"

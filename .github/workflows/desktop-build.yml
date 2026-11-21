@@ -30,9 +30,24 @@ jobs:
       - run: python -m pip install '.[build-desktop]'
       - run: python -m PyInstaller --noconfirm --clean --windowed --name "NRAI Creator" --paths src nrai_desktop.py
       - run: python -m PyInstaller --noconfirm --clean --windowed --name "NRAI Viewer" --paths src nrai_viewer_desktop.py
+      - name: Build Finder thumbnail extension
+        if: runner.os == 'macOS'
+        run: xcodebuild -project platform/macos/NRAIQuickLook/NRAIQuickLook.xcodeproj -scheme NRAIQuickLookExtension -configuration Release -derivedDataPath build/macos-quicklook CODE_SIGNING_ALLOWED=NO build
       - name: Register .nrai with the macOS viewer bundle
         if: runner.os == 'macOS'
-        run: python scripts/register_macos_bundle.py "dist/NRAI Viewer.app"
+        run: python scripts/register_macos_bundle.py "dist/NRAI Viewer.app" --thumbnail-extension "build/macos-quicklook/Build/Products/Release/NRAIQuickLookExtension.appex"
+      - name: Ad-hoc sign the macOS viewer bundle
+        if: runner.os == 'macOS'
+        run: codesign --force --deep --sign - "dist/NRAI Viewer.app"
+      - name: Build Windows Explorer thumbnail provider
+        if: runner.os == 'Windows'
+        run: dotnet build platform/windows/NraiThumbnailHandler/NraiThumbnailHandler.csproj --configuration Release
+      - name: Bundle Windows Explorer thumbnail provider
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Copy-Item platform/windows/NraiThumbnailHandler/bin/Release/net48/*.dll "dist/NRAI Viewer/"
+          Copy-Item platform/windows/install-nrai.ps1, platform/windows/uninstall-nrai.ps1 "dist/NRAI Viewer/"
       - uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact }}

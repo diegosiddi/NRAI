@@ -6,11 +6,12 @@ NRAI is a prototype image container for carrying an unchanged source image byte 
 
 ## What is included
 
-- Version 1 container specification in [FORMAT.md](FORMAT.md).
+- Stable NRAI v1.0 container specification in [FORMAT.md](FORMAT.md), with binary positive and negative interoperability vectors.
 - Python SDK and `nrai` CLI for key generation, creation, inspection, verification, export, and converted derivatives.
 - A cross-platform desktop app for importing an image, configuring all six rights, and creating a signed `.nrai` file.
 - A companion desktop viewer that verifies `.nrai` files, displays their images and rights, and reports the declared screenshot policy.
 - Platform file-type registration assets for macOS, Windows, and Linux so compatible desktop environments can identify and open `.nrai` files.
+- Finder Quick Look and Windows Explorer thumbnail providers. Both verify the v1 manifest before decoding and suppress thumbnails for invalid files or `screenshot: deny`.
 - Android `FLAG_SECURE` integration sketch in [examples/android/ProtectedImageActivity.kt](examples/android/ProtectedImageActivity.kt).
 - Tests and a sample independently configured rights file.
 
@@ -48,15 +49,25 @@ python -m PyInstaller --noconfirm --clean --windowed --name "NRAI Viewer" --path
 
 On macOS this creates `dist/NRAI Creator.app` and `dist/NRAI Viewer.app`; on Windows, both app folders with their bundled dependencies appear under `dist/`. Build on each target platform. These development builds are not code-signed or notarized, so macOS may show its normal warning for apps from an unidentified developer. The **desktop builds** GitHub Actions workflow can build both apps for each platform on demand or when a `v*` tag is pushed, then attach them as workflow artifacts; it does not create a GitHub Release.
 
-For a local macOS build, add the file-type declaration to the Viewer bundle with `python scripts/register_macos_bundle.py "dist/NRAI Viewer.app"`. The desktop workflow runs this step automatically for its macOS artifact.
+For a local macOS build, build the Quick Look extension in Xcode and bundle it with the Viewer:
+
+```sh
+xcodebuild -project platform/macos/NRAIQuickLook/NRAIQuickLook.xcodeproj \
+  -scheme NRAIQuickLookExtension -configuration Release \
+  -derivedDataPath build/macos-quicklook CODE_SIGNING_ALLOWED=NO build
+python scripts/register_macos_bundle.py "dist/NRAI Viewer.app" \
+  --thumbnail-extension "build/macos-quicklook/Build/Products/Release/NRAIQuickLookExtension.appex"
+```
+
+The desktop workflow builds and embeds this extension automatically. Its artifacts are ad-hoc signed, not Developer ID signed or notarized; distribution outside development may require signing and notarization for consistent Quick Look registration.
 
 ## Register the file type on desktop systems
 
-- **macOS:** the Viewer app bundle declares the exported `com.diegosiddi.nrai` Uniform Type Identifier and handles `.nrai` documents. Finder can then open selected files in NRAI Viewer. This does not add an operating-system Quick Look thumbnail or system image decoder.
-- **Windows:** after extracting the Viewer build to a stable folder, run `platform/windows/install-nrai.ps1 -ViewerExe 'C:\path\to\NRAI Viewer.exe'` in PowerShell. This registers the file association for the current Windows user. Windows Settings remains the place to change the preferred app. Run `platform/windows/uninstall-nrai.ps1` to remove the association.
+- **macOS:** the Viewer declares `com.diegosiddi.nrai`, and its Quick Look Thumbnail Extension provides image thumbnails to Finder and other Quick Look clients. The extension verifies the signature and payload before decoding.
+- **Windows:** the desktop artifact includes the Explorer handler and install/uninstall scripts. After extracting the Viewer build to a stable folder, open PowerShell there and run `./install-nrai.ps1 -ViewerExe './NRAI Viewer.exe' -ThumbnailHandlerDll './NraiThumbnailHandler.dll'`. This registers the file association and Explorer thumbnail provider for the current user. Windows Settings remains the place to change the preferred app. Run `./uninstall-nrai.ps1` to remove the association and handler.
 - **Linux desktops using shared-mime-info:** install `platform/linux/application-x-nrai.xml` into the system or user MIME package directory and refresh the desktop MIME database. Install `platform/linux/nrai-viewer.desktop` and make it the preferred handler for `application/vnd.nrai`.
 
-These integrations make compatible desktop shells recognize and open NRAI files. Image preview remains inside NRAI Viewer; native Finder Quick Look and Windows Explorer thumbnail or preview handlers are not included in this prototype. Those need dedicated platform extensions and additional signing, packaging, and validation work.
+The native extensions produce thumbnails, not an editable view of rights. They decline to create thumbnails when verification fails or `screenshot: deny` is present. This avoids creating new cached preview pixels for those files, but cannot erase existing caches, prevent screenshots of the full viewer, or enforce policy system-wide. The Linux metadata currently enables open-with integration; no Linux thumbnailer is included.
 
 ## Quick start
 
@@ -93,7 +104,7 @@ The desktop viewer demo can display a valid image and show the `screenshot` decl
 
 The Android example shows how an application can set `WindowManager.LayoutParams.FLAG_SECURE` for the Activity window after validating the NRAI file and seeing `screenshot: deny`. Android documents this as preventing that window from appearing in screenshots and non-secure displays. It applies only when the image is displayed in that protected application window; it does not protect exported files, other apps, external cameras, rooted or compromised devices, or every device/vendor capture path. See the official [Android `FLAG_SECURE` reference](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#FLAG_SECURE).
 
-File-type open associations are included for desktop platforms, but they do not enforce rights. Protecting arbitrary files system-wide would require OS-level support and cooperation from image decoders, display servers, and capture paths. A file extension or file association alone cannot make screenshots white.
+File-type associations and verified thumbnail handlers are included for macOS and Windows, but they do not enforce rights. Protecting arbitrary files system-wide would require OS-level support and cooperation from image decoders, display servers, and capture paths. A file extension, thumbnail handler, or file association alone cannot make screenshots white.
 
 ## Threat model and limits
 
@@ -113,9 +124,11 @@ python -m pip install '.[test]'
 python -m pytest
 ```
 
+The frozen interoperability vectors are in `tests/vectors/v1/`; regenerate them with `PYTHONPATH=src python scripts/build_conformance_vectors.py`. The Swift thumbnail verifier is tested against the same catalog on macOS CI. The Windows Explorer handler is compiled on Windows CI.
+
 ## Repository status
 
-This is an experimental 0.1 format. The v1 framing is intentionally small and specified in [FORMAT.md](FORMAT.md). Treat new versions as distinct protocol revisions; do not silently reinterpret signed fields.
+NRAI v1.0 is the frozen container revision specified in [FORMAT.md](FORMAT.md); the SDK and desktop apps remain prototype software. Treat incompatible changes as a new protocol version and do not silently reinterpret signed fields. `application/vnd.nrai` is currently a project media-type label, not an IANA registration.
 
 ## License
 

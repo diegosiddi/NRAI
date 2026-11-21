@@ -1,34 +1,48 @@
-# NRAI v1 Container Format
+# NRAI Container Format 1.0
 
-The recommended filename extension is `.nrai`. The registered media type is
-`application/vnd.nrai`, and the macOS Uniform Type Identifier used by this
-prototype is `com.diegosiddi.nrai`. The eight-byte magic at offset zero is the
-authoritative format discriminator; extensions and MIME labels are hints and
-must not replace container validation.
+**Status:** stable format revision 1.0. Implementations that claim NRAI v1.0
+support must accept the framing and manifest rules below. Future incompatible
+changes require a new `version` value. The `1.0` label versions this
+specification; the manifest's integer `version` remains `1`.
 
-This document specifies the experimental version 1 binary container. Integers are unsigned big-endian. The payload is embedded as-is; wrapping does not rewrite, decode, or recompress it.
+The recommended extension is `.nrai`. The project currently uses
+`application/vnd.nrai` as a provisional media-type label; it is not an IANA
+registration. The macOS Uniform Type Identifier is `com.diegosiddi.nrai`.
+These labels help desktop software route files but are not proof that a file is
+valid NRAI. The eight-byte magic is the format discriminator.
 
-## Binary layout
+## 1. Container framing
+
+All integers in the binary header are unsigned, big-endian.
 
 | Offset | Size | Field |
-|---|---:|---|
+|---:|---:|---|
 | 0 | 8 bytes | Magic: `4e 52 41 49 0d 0a 1a 0a` (`NRAI\r\n\x1a\n`) |
-| 8 | 8 bytes | Manifest byte length, unsigned 64-bit big-endian |
-| 16 | N bytes | UTF-8 JSON manifest |
-| 16 + N | remainder | Original image payload bytes |
+| 8 | 8 bytes | Manifest length `N`, unsigned 64-bit big-endian |
+| 16 | `N` bytes | UTF-8 JSON manifest |
+| `16 + N` | remainder | Payload bytes, copied without transformation |
 
-The v1 reader accepts manifests up to 4 MiB and rejects wrong magic, unsupported versions, malformed JSON, truncated headers, digest mismatches, and invalid signatures. There is no padding or trailing data outside the declared payload. The payload may be any media type, though image software should accept only supported image encodings.
+Readers must reject a file shorter than 16 bytes, incorrect magic, a manifest
+length greater than 4,194,304 bytes, a truncated manifest, invalid UTF-8 or
+JSON, a UTF-8 BOM, duplicate object keys, nesting deeper than 64 levels,
+unsupported manifest versions, or a payload that
+does not satisfy the signed length and digest. There is no padding or separate
+trailer. The payload is exactly every byte after the manifest.
 
-## Manifest
+The container layer accepts any payload media type. Image viewers must only
+decode encodings they support, and must verify the manifest and payload before
+decoding.
 
-The JSON object has these required fields:
+## 2. Manifest
+
+The manifest is a UTF-8 JSON object. The following fields are required:
 
 ```json
 {
   "format": "NRAI",
   "version": 1,
-  "asset_id": "UUID",
-  "created_at": "UTC RFC 3339 timestamp",
+  "asset_id": "550e8400-e29b-41d4-a716-446655440000",
+  "created_at": "2025-01-02T03:04:05Z",
   "media_type": "image/jpeg",
   "payload": {
     "length": 12345,
@@ -44,32 +58,80 @@ The JSON object has these required fields:
   },
   "signature": {
     "algorithm": "Ed25519",
-    "key_id": "first 32 hex chars of SHA-256(raw public key)",
+    "key_id": "first 32 lowercase hex characters of SHA-256(raw public key)",
     "public_key": "base64 encoded 32-byte Ed25519 public key",
     "value": "base64 encoded 64-byte Ed25519 signature"
   }
 }
 ```
 
-Rights are independent. Allowed values are `allow`, `deny`, `ask`, and `unspecified`. Readers must preserve unknown extension fields when forwarding a manifest and must not treat missing or `unspecified` rights as `allow`. This prototype validates the six listed keys and emits all six.
+`asset_id` is a canonical lowercase UUID string. `created_at` is a UTC RFC 3339
+date-time with whole-second precision and the exact form `YYYY-MM-DDTHH:MM:SSZ`.
+`media_type` is a syntactically valid type and
+subtype separated by `/`. `payload.length` is an unsigned 64-bit integer and
+must equal the exact number of payload bytes. `payload.sha256` is SHA-256 of
+those bytes, represented by exactly 64 lowercase hexadecimal characters.
 
-Optional fields include `creator` (a display label; not a verified identity) and `lineage`:
+The six `rights` keys above are required in v1. Each value is exactly one of
+`allow`, `deny`, `ask`, or `unspecified`. Missing rights are not allowed and
+must never be interpreted as `allow`.
+
+Optional fields are `creator` (a display string, not a verified identity) and
+`lineage`:
 
 ```json
 {
-  "parent_asset_id": "UUID",
-  "parent_payload_sha256": "...",
+  "parent_asset_id": "550e8400-e29b-41d4-a716-446655440000",
+  "parent_payload_sha256": "64 lowercase hexadecimal characters",
   "operation": "convert:webp",
-  "recorded_at": "UTC RFC 3339 timestamp"
+  "recorded_at": "2025-01-02T03:04:05Z"
 }
 ```
 
-## Signature and integrity
+Readers must preserve unknown top-level extension fields when forwarding a
+manifest. They are covered by the signature. A reader must not assign meaning
+to an unknown field unless an applicable extension specification defines it.
+Unknown keys inside the v1 `rights` and `lineage` objects are invalid.
 
-To verify the signature, remove the `signature` field, serialize the remaining JSON object with UTF-8, sorted keys, no insignificant spaces, and unescaped Unicode, then verify the Ed25519 signature over those bytes. The signature object embeds the raw public key. `key_id` is SHA-256 of that key, truncated to the first 32 lowercase hex characters. Trust in the key must be established separately.
+## 3. Canonical JSON and signature
 
-The SHA-256 hash is computed over the exact payload bytes and its byte count is signed. A container is valid only when both signature verification and payload length/hash checks pass. This detects edits; it does not prevent them.
+To verify the signature:
 
-## Derivatives
+1. Copy the manifest object and remove its `signature` member.
+2. Serialize as UTF-8 JSON with object keys sorted by Unicode code point,
+   arrays in their existing order, no insignificant whitespace, and Unicode
+   characters emitted directly except JSON-required escapes for quotation
+   marks, backslashes, and control characters.
+3. Reject duplicate keys, floating-point numbers, `NaN`, and infinity. JSON
+   integers must fit in signed or unsigned 64-bit range and use decimal
+   notation; booleans and `null` retain their JSON spellings.
+4. Verify the Ed25519 signature over the resulting bytes.
 
-A compatible converter decodes the parent payload, performs its documented transformation, creates a new asset ID, hashes the resulting encoded bytes, copies the parent's rights, records the parent asset ID and payload hash, and signs the new manifest with the converter's signing key. The derivative signature identifies the signer of the new statement, not necessarily the original creator. This protocol cannot make arbitrary third-party conversions inherit metadata.
+The signature embeds the raw 32-byte public key as base64. `key_id` is the
+first 32 lowercase hexadecimal characters of SHA-256 over that raw key. The
+embedded key permits integrity verification; it does not establish who owns
+the key. Applications need a separate trust store or other verified identity
+binding for that claim.
+
+## 4. Rights and derivatives
+
+Rights are signed declarations. NRAI does not itself enforce them. Compatible
+software should communicate and follow them, but arbitrary software, exports,
+screenshots, or re-encoding can discard the wrapper and manifest.
+
+A compatible converter may create a derivative by decoding the parent payload,
+performing a documented operation, assigning a new asset ID, hashing the new
+payload, copying the rights, recording the parent asset ID and digest in
+`lineage`, and signing the new manifest. The derivative signature identifies
+the signer of the new statement, not necessarily the original creator. Lineage
+is only available when the conversion tool records it; it is not guaranteed
+across unrelated software.
+
+## 5. Conformance vectors
+
+The machine-readable catalog and binary fixtures in
+[`tests/vectors/v1/`](tests/vectors/v1/) define positive and negative v1.0
+cases. An implementation conforms to this prototype suite when it accepts the
+valid vector and rejects each invalid vector for the specified reason. New
+implementations should add their own results without changing the frozen
+fixture bytes.

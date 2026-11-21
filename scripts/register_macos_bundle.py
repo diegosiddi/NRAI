@@ -1,6 +1,8 @@
 """Add Finder document-type metadata to a PyInstaller macOS app bundle."""
 
 import plistlib
+import argparse
+import shutil
 import sys
 from pathlib import Path
 
@@ -8,7 +10,7 @@ from pathlib import Path
 UTI = "com.diegosiddi.nrai"
 
 
-def register_bundle(bundle_path):
+def register_bundle(bundle_path, thumbnail_extension=None):
     bundle = Path(bundle_path)
     info_path = bundle / "Contents" / "Info.plist"
     if not info_path.is_file():
@@ -46,8 +48,21 @@ def register_bundle(bundle_path):
     with info_path.open("wb") as target:
         plistlib.dump(info, target, sort_keys=False)
 
+    if thumbnail_extension:
+        extension = Path(thumbnail_extension)
+        if not extension.is_dir() or extension.suffix != ".appex":
+            raise ValueError("Quick Look thumbnail extension must be a built .appex bundle")
+        plugins = bundle / "Contents" / "PlugIns"
+        plugins.mkdir(parents=True, exist_ok=True)
+        destination = plugins / extension.name
+        if destination.exists():
+            raise FileExistsError("Quick Look extension already exists in app bundle: %s" % destination)
+        shutil.copytree(extension, destination, symlinks=True)
+
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: register_macos_bundle.py APP_BUNDLE")
-    register_bundle(sys.argv[1])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("app_bundle")
+    parser.add_argument("--thumbnail-extension")
+    args = parser.parse_args()
+    register_bundle(args.app_bundle, args.thumbnail_extension)

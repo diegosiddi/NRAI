@@ -1,0 +1,60 @@
+{
+  "suite": "NRAI Container Format 1.0",
+  "test_key_note": "The fixture signing seed is public and test-only.",
+  "vectors": [
+    {
+      "file": "valid.nrai",
+      "stage": "verify",
+      "expected": "accept",
+      "reason": "valid signature and payload digest"
+    },
+    {
+      "file": "bad-payload-length.nrai",
+      "stage": "verify",
+      "expected": "reject",
+      "reason": "payload length mismatch"
+    },
+    {
+      "file": "bad-signature.nrai",
+      "stage": "verify",
+      "expected": "reject",
+      "reason": "signature invalid"
+    },
+    {
+      "file": "unsupported-version.nrai",
+      "stage": "load",
+      "expected": "reject",
+      "reason": "unsupported manifest version"
+    },
+    {
+      "file": "float-extension.nrai",
+      "stage": "load",
+      "expected": "reject",
+      "reason": "floating-point JSON number"
+    },
+    {
+      "file": "duplicate-key.nrai",
+      "stage": "load",
+      "expected": "reject",
+      "reason": "duplicate json object key"
+    },
+    {
+      "file": "utf8-bom.nrai",
+      "stage": "load",
+      "expected": "reject",
+      "reason": "UTF-8 BOM"
+    },
+    {
+      "file": "truncated-header.nrai",
+      "stage": "load",
+      "expected": "reject",
+      "reason": "truncated header"
+    },
+    {
+      "file": "wrong-magic.nrai",
+      "stage": "load",
+      "expected": "reject",
+      "reason": "wrong magic"
+    }
+  ]
+}
