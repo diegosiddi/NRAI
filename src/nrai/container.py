@@ -105,7 +105,16 @@ def make_lineage(parent, operation):
 
 
 def media_type_for(path):
-    return mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+    detected = mimetypes.guess_type(str(path))[0]
+    if detected:
+        return detected
+    image_types = {
+        ".avif": "image/avif",
+        ".heic": "image/heic",
+        ".heif": "image/heif",
+        ".svg": "image/svg+xml",
+    }
+    return image_types.get(Path(path).suffix.lower(), "application/octet-stream")
 
 
 def converted_payload(payload, target_format):
