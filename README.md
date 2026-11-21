@@ -10,6 +10,7 @@ NRAI is a prototype image container for carrying an unchanged source image byte 
 - Python SDK and `nrai` CLI for key generation, creation, inspection, verification, export, and converted derivatives.
 - A cross-platform desktop app for importing an image, configuring all six rights, and creating a signed `.nrai` file.
 - A companion desktop viewer that verifies `.nrai` files, displays their images and rights, and reports the declared screenshot policy.
+- Platform file-type registration assets for macOS, Windows, and Linux so compatible desktop environments can identify and open `.nrai` files.
 - Android `FLAG_SECURE` integration sketch in [examples/android/ProtectedImageActivity.kt](examples/android/ProtectedImageActivity.kt).
 - Tests and a sample independently configured rights file.
 
@@ -47,6 +48,16 @@ python -m PyInstaller --noconfirm --clean --windowed --name "NRAI Viewer" --path
 
 On macOS this creates `dist/NRAI Creator.app` and `dist/NRAI Viewer.app`; on Windows, both app folders with their bundled dependencies appear under `dist/`. Build on each target platform. These development builds are not code-signed or notarized, so macOS may show its normal warning for apps from an unidentified developer. The **desktop builds** GitHub Actions workflow can build both apps for each platform on demand or when a `v*` tag is pushed, then attach them as workflow artifacts; it does not create a GitHub Release.
 
+For a local macOS build, add the file-type declaration to the Viewer bundle with `python scripts/register_macos_bundle.py "dist/NRAI Viewer.app"`. The desktop workflow runs this step automatically for its macOS artifact.
+
+## Register the file type on desktop systems
+
+- **macOS:** the Viewer app bundle declares the exported `com.diegosiddi.nrai` Uniform Type Identifier and handles `.nrai` documents. Finder can then open selected files in NRAI Viewer. This does not add an operating-system Quick Look thumbnail or system image decoder.
+- **Windows:** after extracting the Viewer build to a stable folder, run `platform/windows/install-nrai.ps1 -ViewerExe 'C:\path\to\NRAI Viewer.exe'` in PowerShell. This registers the file association for the current Windows user. Windows Settings remains the place to change the preferred app. Run `platform/windows/uninstall-nrai.ps1` to remove the association.
+- **Linux desktops using shared-mime-info:** install `platform/linux/application-x-nrai.xml` into the system or user MIME package directory and refresh the desktop MIME database. Install `platform/linux/nrai-viewer.desktop` and make it the preferred handler for `application/vnd.nrai`.
+
+These integrations make compatible desktop shells recognize and open NRAI files. Image preview remains inside NRAI Viewer; native Finder Quick Look and Windows Explorer thumbnail or preview handlers are not included in this prototype. Those need dedicated platform extensions and additional signing, packaging, and validation work.
+
 ## Quick start
 
 ```sh
@@ -82,7 +93,7 @@ The desktop viewer demo can display a valid image and show the `screenshot` decl
 
 The Android example shows how an application can set `WindowManager.LayoutParams.FLAG_SECURE` for the Activity window after validating the NRAI file and seeing `screenshot: deny`. Android documents this as preventing that window from appearing in screenshots and non-secure displays. It applies only when the image is displayed in that protected application window; it does not protect exported files, other apps, external cameras, rooted or compromised devices, or every device/vendor capture path. See the official [Android `FLAG_SECURE` reference](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#FLAG_SECURE).
 
-No general desktop OS integration is included. Protecting arbitrary files system-wide would require OS-level support and cooperation from image decoders, display servers, and capture paths. A file extension or file association alone cannot make screenshots white.
+File-type open associations are included for desktop platforms, but they do not enforce rights. Protecting arbitrary files system-wide would require OS-level support and cooperation from image decoders, display servers, and capture paths. A file extension or file association alone cannot make screenshots white.
 
 ## Threat model and limits
 

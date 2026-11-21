@@ -1,5 +1,11 @@
 # NRAI v1 Container Format
 
+The recommended filename extension is `.nrai`. The registered media type is
+`application/vnd.nrai`, and the macOS Uniform Type Identifier used by this
+prototype is `com.diegosiddi.nrai`. The eight-byte magic at offset zero is the
+authoritative format discriminator; extensions and MIME labels are hints and
+must not replace container validation.
+
 This document specifies the experimental version 1 binary container. Integers are unsigned big-endian. The payload is embedded as-is; wrapping does not rewrite, decode, or recompress it.
 
 ## Binary layout

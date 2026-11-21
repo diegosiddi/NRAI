@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=NRAI Viewer
+Comment=Verify and view signed NRAI image containers
+Exec=nrai-viewer %f
+Terminal=false
+Categories=Graphics;Viewer;
+MimeType=application/vnd.nrai;

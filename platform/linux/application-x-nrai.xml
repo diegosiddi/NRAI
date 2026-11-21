@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/vnd.nrai">
+    <comment>NRAI protected image</comment>
+    <glob pattern="*.nrai" weight="80"/>
+    <magic priority="80">
+      <match type="string" value="NRAI\r\n\032\n" offset="0"/>
+    </magic>
+  </mime-type>
+</mime-info>
