@@ -1,0 +1,8 @@
+{
+  "ai_training": "deny",
+  "ai_finetuning": "deny",
+  "ai_inference": "ask",
+  "ai_analysis": "ask",
+  "screenshot": "deny",
+  "redistribution": "ask"
+}
