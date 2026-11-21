@@ -7,10 +7,10 @@ NRAI is a prototype image container for carrying an unchanged source image byte 
 ## What is included
 
 - Version 1 container specification in [FORMAT.md](FORMAT.md).
-- Python SDK and 0nrai0 CLI for key generation, creation, inspection, verification, export, and converted derivatives.
-- A cross-platform desktop app for importing an image, configuring all six rights, and creating a signed 0.nrai0 file.
+- Python SDK and the `nrai` CLI for key generation, creation, inspection, verification, export, and converted derivatives.
+- A cross-platform desktop app for importing an image, configuring all six rights, and creating a signed `.nrai` file.
 - A small desktop viewer that refuses invalid signatures and displays the declared screenshot policy.
-- Android 0FLAG_SECURE0 integration sketch in [examples/android/ProtectedImageActivity.kt](examples/android/ProtectedImageActivity.kt).
+- Android `FLAG_SECURE0 integration sketch in [examples/android/ProtectedImageActivity.kt](examples/android/ProtectedImageActivity.kt).
 - Tests and a sample independently configured rights file.
 
 ## Install
@@ -31,7 +31,7 @@ Launch the creator with:
 nrai-desktop
 `
 
-Choose an image, set each rights value, optionally enter a creator name, and choose where to save the `.nrai0 file. The app creates an Ed25519 signing key on first launch in the current user's application-data directory and reuses it for future files. The private key stays on that computer and is not embedded in the NRAI file. Back it up securely if you need to sign future files with the same key; anyone who obtains it can sign as that key. The app also saves the matching public key next to it.
+Choose an image, set each rights value, optionally enter a creator name, and choose where to save the `.nrai` file. The app creates an Ed25519 signing key on first launch in the current user's application-data directory and reuses it for future files. The private key stays on that computer and is not embedded in the NRAI file. Back it up securely if you need to sign future files with the same key; anyone who obtains it can sign as that key. The app also saves the matching public key next to it.
 
 To build a native app for the current platform, install PyInstaller and run:
 
@@ -40,7 +40,7 @@ python -m pip install '.[build-desktop]'
 python -m PyInstaller --noconfirm --clean --windowed --name NRAI --paths src nrai_desktop.py
 `
 
-On macOS this creates `dist/NRAI.app0; on Windows it creates `dist/NRAI.exe0. Build on each target platform. These development builds are not code-signed or notarized, so macOS may show its normal warning for apps from an unidentified developer. The **desktop builds** GitHub Actions workflow can build both platforms on demand or when a `v*0 tag is pushed, then attach the files as workflow artifacts; it does not create a GitHub Release.
+On macOS this creates `dist/NRAI.app`; on Windows the executable and its bundled dependencies are in `dist/NRAI/`. Build on each target platform. These development builds are not code-signed or notarized, so macOS may show its normal warning for apps from an unidentified developer. The **desktop builds** GitHub Actions workflow can build both platforms on demand or when a `v*` tag is pushed, then attach the files as workflow artifacts; it does not create a GitHub Release.
 
 ## Quick start
 
@@ -52,7 +52,7 @@ nrai verify photo.nrai --trusted-key creator.public.pem
 nrai-viewer photo.nrai
 `
 
-`verify0 checks the payload digest and Ed25519 signature. With `--trusted-key0, it also checks that the signer matches the supplied key. Without a trusted key, a valid signature proves only that the embedded key signed the manifest; it does not establish who controls that key.
+`verify` checks the payload digest and Ed25519 signature. With `--trusted-key`, it also checks that the signer matches the supplied key. Without a trusted key, a valid signature proves only that the embedded key signed the manifest; it does not establish who controls that key.
 
 Convert to another image encoding while carrying rights into a newly signed NRAI file:
 
@@ -68,13 +68,13 @@ nrai export photo.nrai exported-photo.jpg
 
 ## Rights model
 
-Each right has its own `allow0, `deny0, `ask0, or `unspecified0 value. Supported keys are `ai_training0, `ai_finetuning0, `ai_inference0, `ai_analysis0, `screenshot0, and `redistribution0. Missing keys become `unspecified0; software should not interpret that as permission. The manifest is signed as a whole, so changing any policy requires a new signature.
+Each right has its own `allow`, `deny`, `ask`, or `unspecified` value. Supported keys are `ai_training`, `ai_finetuning`, `ai_inference`, `ai_analysis`, `screenshot`, and `redistribution`. Missing keys become `unspecified`; software should not interpret that as permission. The manifest is signed as a whole, so changing any policy requires a new signature.
 
 ## Viewer and screenshot behavior
 
-The desktop viewer demo can display a valid image and show the `screenshot0 declaration. Tkinter does not provide a portable way to stop OS screenshots, screen recording, remote desktop capture, cameras, or another program from reading pixels. It does not pretend to block screenshots.
+The desktop viewer demo can display a valid image and show the `screenshot` declaration. Tkinter does not provide a portable way to stop OS screenshots, screen recording, remote desktop capture, cameras, or another program from reading pixels. It does not pretend to block screenshots.
 
-The Android example shows how an application can set `WindowManager.LayoutParams.FLAG_SECURE0 for the Activity window after validating the NRAI file and seeing `screenshot: deny0. Android documents this as preventing that window from appearing in screenshots and non-secure displays. It applies only when the image is displayed in that protected application window; it does not protect exported files, other apps, external cameras, rooted or compromised devices, or every device/vendor capture path. See the official [Android `FLAG_SECURE0 reference](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#FLAG_SECURE).
+The Android example shows how an application can set `WindowManager.LayoutParams.FLAG_SECURE` for the Activity window after validating the NRAI file and seeing `screenshot: deny`. Android documents this as preventing that window from appearing in screenshots and non-secure displays. It applies only when the image is displayed in that protected application window; it does not protect exported files, other apps, external cameras, rooted or compromised devices, or every device/vendor capture path. See the official [Android `FLAG_SECURE` reference](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#FLAG_SECURE).
 
 No general desktop OS integration is included. Protecting arbitrary files system-wide would require OS-level support and cooperation from image decoders, display servers, and capture paths. A file extension or file association alone cannot make screenshots white.
 
