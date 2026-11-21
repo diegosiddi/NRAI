@@ -1,21 +1,67 @@
-MIT License
+NRAI END-USER, NON-COMMERCIAL LICENSE
+Version 1.0
 
-Copyright (c) 2026 diegosiddi
+Copyright (c) 2026 Diego Siddi
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This license applies to the software and documentation in this repository (the
+"Software"). It does not change rights in image files, NRAI containers, or other
+materials owned by their respective creators or identified as third-party
+materials with separate terms.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. Permission for end-user use
+
+Subject to this license, the copyright holder grants you a limited, worldwide,
+royalty-free, non-exclusive license to download, install, run, and use an
+unmodified copy of the Software for personal, educational, research, testing,
+or evaluation purposes, provided the use is non-commercial.
+
+You may make copies reasonably necessary to install, run, and back up the
+Software. You may give or redistribute complete, unmodified copies at no
+charge for non-commercial end-user use, provided that each copy includes this
+license and all copyright and attribution notices.
+
+2. Uses requiring separate permission
+
+You may not modify, adapt, translate, or create derivative works of the
+Software, or distribute modified versions, without prior written permission
+from the copyright holder.
+
+You may not make commercial use of the Software without prior written
+permission from the copyright holder. "Commercial use" means use in or for a
+business, trade, or profession; use intended to obtain commercial advantage or
+monetary compensation; internal business use; offering the Software as a paid
+product, service, or hosted service; or incorporating it into a paid offering.
+This restriction applies even if the Software itself is provided at no charge.
+
+Permission for a restricted use must be granted in a separate written license
+or other written authorization from the copyright holder. No permission is
+implied by access to the source code, a public repository, or this license.
+
+3. Restrictions and reserved rights
+
+You may not remove or alter this license or copyright notices from copies you
+are permitted to make. You may not sublicense the Software or grant rights
+beyond those expressly stated here. All rights not expressly granted are
+reserved by the copyright holder.
+
+4. Termination
+
+This license terminates automatically if you materially breach its terms. Upon
+termination, you must stop using and distributing the Software and destroy
+copies under your control. Sections concerning ownership, restrictions,
+disclaimers, and liability survive termination.
+
+5. No warranty; limitation of liability
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. TO THE MAXIMUM EXTENT
+PERMITTED BY LAW, THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY CLAIM,
+DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
+OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.
+
+6. Third-party materials
+
+Third-party components and materials remain subject to their own licenses and
+notices. This license does not replace or restrict those separate terms.
