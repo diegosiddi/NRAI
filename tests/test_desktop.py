@@ -44,6 +44,14 @@ class DesktopCreatorTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "not recognized as an image"):
                 create_image_container(source, output, {}, Ed25519PrivateKey.generate())
 
+    def test_creator_accepts_formats_not_always_in_os_mime_databases(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "source.heic"
+            source.write_bytes(b"HEIC payload")
+            output = Path(folder) / "source.nrai"
+            document = create_image_container(source, output, {}, Ed25519PrivateKey.generate())
+        self.assertEqual(document.manifest["media_type"], "image/heic")
+
 
 if __name__ == "__main__":
     unittest.main()
