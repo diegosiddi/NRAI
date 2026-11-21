@@ -14,7 +14,7 @@ dependencies = ["cryptography>=41"]
 [project.optional-dependencies]
 images = ["Pillow>=9"]
 test = ["pytest>=7", "Pillow>=9"]
-build-desktop = ["pyinstaller>=6"]
+build-desktop = ["pyinstaller>=6", "Pillow>=9"]
 
 [project.scripts]
 nrai = "nrai.cli:main"

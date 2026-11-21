@@ -7,64 +7,70 @@ NRAI is a prototype image container for carrying an unchanged source image byte 
 ## What is included
 
 - Version 1 container specification in [FORMAT.md](FORMAT.md).
-- Python SDK and the `nrai` CLI for key generation, creation, inspection, verification, export, and converted derivatives.
+- Python SDK and `nrai` CLI for key generation, creation, inspection, verification, export, and converted derivatives.
 - A cross-platform desktop app for importing an image, configuring all six rights, and creating a signed `.nrai` file.
-- A small desktop viewer that refuses invalid signatures and displays the declared screenshot policy.
-- Android `FLAG_SECURE0 integration sketch in [examples/android/ProtectedImageActivity.kt](examples/android/ProtectedImageActivity.kt).
+- A companion desktop viewer that verifies `.nrai` files, displays their images and rights, and reports the declared screenshot policy.
+- Android `FLAG_SECURE` integration sketch in [examples/android/ProtectedImageActivity.kt](examples/android/ProtectedImageActivity.kt).
 - Tests and a sample independently configured rights file.
 
 ## Install
 
 Python 3.9 or later is required. Install the package:
 
-`sh
+```sh
 python -m pip install .
-`
+```
 
 Tkinter is included with most standard Python distributions. On Linux, you may need to install your distribution's Tk package separately. The image creator does not re-encode the selected file; the exact source bytes are carried into the NRAI container.
+
+The viewer needs Pillow when running from Python. Install it with `python -m pip install '.[images]'`.
 
 ## Desktop app
 
 Launch the creator with:
 
-`sh
+```sh
 nrai-desktop
-`
+```
 
 Choose an image, set each rights value, optionally enter a creator name, and choose where to save the `.nrai` file. The app creates an Ed25519 signing key on first launch in the current user's application-data directory and reuses it for future files. The private key stays on that computer and is not embedded in the NRAI file. Back it up securely if you need to sign future files with the same key; anyone who obtains it can sign as that key. The app also saves the matching public key next to it.
 
+Launch **NRAI Viewer** to choose and inspect an existing `.nrai` file, or pass the path to `nrai-viewer`. The viewer checks the payload digest and signature before decoding the image, displays all six rights, and can optionally verify against a trusted public key. A valid signature without a trusted key confirms that the embedded key signed the manifest but does not identify its owner. Screenshot policy is displayed as a declaration; the viewer cannot block OS screenshots or screen recording.
+
 To build a native app for the current platform, install PyInstaller and run:
 
-`sh
+```sh
 python -m pip install '.[build-desktop]'
-python -m PyInstaller --noconfirm --clean --windowed --name NRAI --paths src nrai_desktop.py
-`
+python -m PyInstaller --noconfirm --clean --windowed --name "NRAI Creator" --paths src nrai_desktop.py
+python -m PyInstaller --noconfirm --clean --windowed --name "NRAI Viewer" --paths src nrai_viewer_desktop.py
+```
 
-On macOS this creates `dist/NRAI.app`; on Windows the executable and its bundled dependencies are in `dist/NRAI/`. Build on each target platform. These development builds are not code-signed or notarized, so macOS may show its normal warning for apps from an unidentified developer. The **desktop builds** GitHub Actions workflow can build both platforms on demand or when a `v*` tag is pushed, then attach the files as workflow artifacts; it does not create a GitHub Release.
+On macOS this creates `dist/NRAI Creator.app` and `dist/NRAI Viewer.app`; on Windows, both app folders with their bundled dependencies appear under `dist/`. Build on each target platform. These development builds are not code-signed or notarized, so macOS may show its normal warning for apps from an unidentified developer. The **desktop builds** GitHub Actions workflow can build both apps for each platform on demand or when a `v*` tag is pushed, then attach them as workflow artifacts; it does not create a GitHub Release.
 
 ## Quick start
 
-`sh
+```sh
 nrai keygen --private creator.private.pem --public creator.public.pem
-nrai create photo.jpg photo.nrai --private-key creator.private.pem   --rights examples/rights.json --creator 'Example creator'
+nrai create photo.jpg photo.nrai --private-key creator.private.pem \
+  --rights examples/rights.json --creator 'Example creator'
 nrai inspect photo.nrai
 nrai verify photo.nrai --trusted-key creator.public.pem
 nrai-viewer photo.nrai
-`
+```
 
 `verify` checks the payload digest and Ed25519 signature. With `--trusted-key`, it also checks that the signer matches the supplied key. Without a trusted key, a valid signature proves only that the embedded key signed the manifest; it does not establish who controls that key.
 
 Convert to another image encoding while carrying rights into a newly signed NRAI file:
 
-`sh
+```sh
 nrai convert photo.nrai photo-small.nrai --to webp --private-key creator.private.pem
-`
+```
 
 The conversion records the parent asset ID and payload digest. It copies rights because this SDK controls the conversion path. If you export raw image bytes, a JSON sidecar is written next to them, but the exported image itself has no NRAI enforcement:
 
-`sh
+```sh
 nrai export photo.nrai exported-photo.jpg
-`
+```
 
 ## Rights model
 
@@ -91,10 +97,10 @@ NRAI is designed to detect accidental corruption and communicate a creator's dec
 
 ## Development
 
-`sh
+```sh
 python -m pip install '.[test]'
 python -m pytest
-`
+```
 
 ## Repository status
 
