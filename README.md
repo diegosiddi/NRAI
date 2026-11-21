@@ -89,3 +89,6 @@ open source under the [Open Source Definition](https://opensource.org/osd),
 which requires allowing derived works and use across fields of endeavor,
 including business use. This license covers repository software, not image
 assets or NRAI rights declarations created by users.
+
+
+This repository is public. GitHub's terms allow other GitHub users to view and fork public repositories, and changing a repository to private later does not remove existing forks or local copies. See [GitHub's repository licensing guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository). The custom license states the permitted uses; it cannot technically prevent copies or forks from being made.
