@@ -22,10 +22,22 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
-      - run: swiftc -swift-version 5 platform/macos/NRAIQuickLook/NRAIV1.swift platform/macos/NRAIQuickLook/ConformanceHarness.swift -o "$RUNNER_TEMP/nrai-v1-conformance"
-      - run: "$RUNNER_TEMP/nrai-v1-conformance" tests/vectors/v1
-      - run: swiftc -typecheck -swift-version 5 -framework AppKit -framework QuickLookThumbnailing platform/macos/NRAIQuickLook/NRAIV1.swift platform/macos/NRAIQuickLook/NRAIThumbnailProvider.swift
-      - run: xcodebuild -project platform/macos/NRAIQuickLook/NRAIQuickLook.xcodeproj -scheme NRAIQuickLookExtension -configuration Release -derivedDataPath "$RUNNER_TEMP/nrai-quicklook" CODE_SIGNING_ALLOWED=NO build
+      - run: >-
+          swiftc -swift-version 5 platform/macos/NRAIQuickLook/NRAIV1.swift
+          platform/macos/NRAIQuickLook/ConformanceHarness.swift
+          -o "$RUNNER_TEMP/nrai-v1-conformance"
+      - run: >-
+          "$RUNNER_TEMP/nrai-v1-conformance" tests/vectors/v1
+      - run: >-
+          swiftc -typecheck -swift-version 5 -framework AppKit
+          -framework QuickLookThumbnailing
+          platform/macos/NRAIQuickLook/NRAIV1.swift
+          platform/macos/NRAIQuickLook/NRAIThumbnailProvider.swift
+      - run: >-
+          xcodebuild -project platform/macos/NRAIQuickLook/NRAIQuickLook.xcodeproj
+          -scheme NRAIQuickLookExtension -configuration Release
+          -derivedDataPath "$RUNNER_TEMP/nrai-quicklook"
+          CODE_SIGNING_ALLOWED=NO build
 
   windows-preview:
     runs-on: windows-latest
