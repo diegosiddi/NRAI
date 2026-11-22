@@ -138,18 +138,6 @@ NRAI v1 remains the container revision specified in [FORMAT.md](FORMAT.md); revi
 
 ## License
 
-The repository software is available under the custom [NRAI End-User,
-Non-Commercial License](LICENSE). It permits free, unmodified, non-commercial
-end-user use; alterations and commercial use require separate written
-permission from the copyright holder. This is source-available software, not
-open source under the [Open Source Definition](https://opensource.org/osd),
-which requires allowing derived works and use across fields of endeavor,
-including business use. This license covers repository software, not image
-assets or NRAI rights declarations created by users.
+The repository software is licensed under the [Apache License, Version 2.0](LICENSE). It permits use, modification, redistribution, and commercial use, subject to its terms. The [NOTICE](NOTICE) credits Diego Siddi and asks users to provide attribution. Apache 2.0 does not require attribution just for using the software internally; when distributing derivative works, its section 4(d) requires preserving the attribution notice in one of the allowed locations. The request to credit Diego for other uses is informational, not an additional license condition.
 
-This repository is public. GitHub's terms allow other GitHub users to view and
-fork public repositories, and changing a repository to private later does not
-remove existing forks or local copies. See [GitHub's repository licensing
-guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository).
-The custom license states the permitted uses; it cannot technically prevent
-copies or forks from being made.
+The public repository can be forked and copied. Apache 2.0 grants the permissions described in the license, and GitHub repository visibility settings do not add restrictions to those permissions.
