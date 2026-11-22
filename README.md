@@ -138,6 +138,6 @@ NRAI v1 remains the container revision specified in [FORMAT.md](FORMAT.md); revi
 
 ## License
 
-The repository software is licensed under the [Apache License, Version 2.0](LICENSE). It permits use, modification, redistribution, and commercial use, subject to its terms. The [NOTICE](NOTICE) credits Diego Siddi and asks users to provide attribution. Apache 2.0 does not require attribution just for using the software internally; when distributing derivative works, its section 4(d) requires preserving the attribution notice in one of the allowed locations. The request to credit Diego for other uses is informational, not an additional license condition.
+The repository software is licensed under the [Apache License, Version 2.0](LICENSE). It permits use, modification, redistribution, and commercial use, subject to its terms. Apache 2.0 does not require attribution just for using the software; credit to Diego Siddi is appreciated.
 
 The public repository can be forked and copied. Apache 2.0 grants the permissions described in the license, and GitHub repository visibility settings do not add restrictions to those permissions.
