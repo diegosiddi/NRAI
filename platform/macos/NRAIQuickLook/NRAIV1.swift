@@ -15,6 +15,7 @@ enum NRAIError: Error {
     case payloadDigest
     case invalidSignature
     case screenshotDenied
+    case encryptedThumbnailUnsupported
 }
 
 struct NRAIV1 {
@@ -50,6 +51,7 @@ struct NRAIV1 {
             throw NRAIError.unsupportedVersion
         }
         try validate(manifest)
+        if forThumbnail && manifest.keys.contains("encryption") { throw NRAIError.encryptedThumbnailUnsupported }
 
         let payload = data.subdata(in: end..<data.count)
         guard let payloadInfo = manifest["payload"] as? [String: Any],

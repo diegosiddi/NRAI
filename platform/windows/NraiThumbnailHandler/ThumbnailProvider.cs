@@ -124,6 +124,8 @@ namespace Nrai.Shell
                 throw new InvalidDataException("Comments are not allowed in NRAI JSON.");
 
             ValidateManifest(manifest);
+            if (manifest.Property("encryption") != null)
+                throw new InvalidDataException("Encrypted NRAI payloads are not rendered as Explorer thumbnails.");
             var payload = new byte[bytes.Length - (int)payloadStart];
             Buffer.BlockCopy(bytes, (int)payloadStart, payload, 0, payload.Length);
             var payloadInfo = (JObject)manifest["payload"];

@@ -4,9 +4,9 @@ import argparse
 import io
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from .container import RIGHTS, load_document, verify_document
+from .container import RIGHTS, decrypt_document, load_document, verify_document
 from .crypto import load_public_key
 
 RIGHT_LABELS = {
@@ -19,19 +19,20 @@ RIGHT_LABELS = {
 }
 
 
-def load_verified_image(file_path, trusted_key_path=None):
+def load_verified_image(file_path, trusted_key_path=None, encryption_password=None):
     """Verify an NRAI document, then decode its image payload for display."""
     doc = load_document(file_path)
     trusted_key = load_public_key(trusted_key_path) if trusted_key_path else None
     valid, reason = verify_document(doc, trusted_key)
     if not valid:
         raise ValueError("Refusing to display an invalid NRAI file: " + reason)
+    payload = decrypt_document(doc, encryption_password, trusted_key) if doc.manifest.get("encryption") else doc.payload
     try:
         from PIL import Image
     except ImportError as exc:
         raise RuntimeError("Install Pillow to display NRAI images") from exc
     try:
-        with Image.open(io.BytesIO(doc.payload)) as source:
+        with Image.open(io.BytesIO(payload)) as source:
             source.load()
             image = source.copy()
     except Exception as exc:
@@ -108,7 +109,22 @@ class NraiViewerApp:
 
     def open_file(self, path):
         try:
-            doc, image, reason = load_verified_image(path, self.trusted_key_path)
+            candidate = load_document(path)
+            trusted = load_public_key(self.trusted_key_path) if self.trusted_key_path else None
+            valid, reason = verify_document(candidate, trusted)
+            if not valid:
+                raise ValueError("Refusing to display an invalid NRAI file: " + reason)
+            password = None
+            if candidate.manifest.get("encryption"):
+                password = simpledialog.askstring(
+                    "Encrypted NRAI image",
+                    "Enter the passphrase to decrypt this image:",
+                    show="•",
+                    parent=self.root,
+                )
+                if password is None:
+                    return
+            doc, image, reason = load_verified_image(path, self.trusted_key_path, password)
             from PIL import ImageTk
             photo = ImageTk.PhotoImage(image)
         except (OSError, ValueError, RuntimeError) as exc:

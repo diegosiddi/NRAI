@@ -6,11 +6,16 @@ import mimetypes
 import re
 import struct
 import uuid
+import base64
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from cryptography.hazmat.primitives import serialization
 
-from .crypto import canonical_json, load_private_key, sign_manifest, verify_manifest
+from .crypto import (
+    canonical_json, decrypt_payload, encrypt_payload, load_private_key,
+    sign_manifest, verify_manifest,
+)
 
 MAGIC = b"NRAI\r\n\x1a\n"
 PREFIX = struct.Struct(">Q")
@@ -144,6 +149,36 @@ def validate_manifest(manifest):
     if not isinstance(signature["public_key"], str) or not isinstance(signature["value"], str):
         raise ValueError("signature key and value must be base64 strings")
 
+    if "encryption" in manifest:
+        encryption = manifest["encryption"]
+        fields = {
+            "algorithm", "kdf", "salt", "nonce", "scrypt_n", "scrypt_r",
+            "scrypt_p", "plaintext_length", "plaintext_sha256",
+        }
+        if not isinstance(encryption, dict) or set(encryption) != fields:
+            raise ValueError("encryption descriptor has invalid fields")
+        if encryption["algorithm"] != "AES-256-GCM" or encryption["kdf"] != "scrypt":
+            raise ValueError("unsupported NRAI payload encryption")
+        if (type(encryption["scrypt_n"]) is not int or encryption["scrypt_n"] != 32768 or
+                type(encryption["scrypt_r"]) is not int or encryption["scrypt_r"] != 8 or
+                type(encryption["scrypt_p"]) is not int or encryption["scrypt_p"] != 1):
+            raise ValueError("unsupported NRAI scrypt parameters")
+        if (type(encryption["plaintext_length"]) is not int or
+                not 0 <= encryption["plaintext_length"] <= 0xFFFFFFFFFFFFFFFF):
+            raise ValueError("encryption.plaintext_length must be an unsigned 64-bit integer")
+        if (not isinstance(encryption["plaintext_sha256"], str) or
+                not _SHA256_RE.fullmatch(encryption["plaintext_sha256"])):
+            raise ValueError("encryption.plaintext_sha256 must be a SHA-256 hex digest")
+        try:
+            salt = base64.b64decode(encryption["salt"], validate=True)
+            nonce = base64.b64decode(encryption["nonce"], validate=True)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("encryption salt and nonce must be base64 strings") from exc
+        if len(salt) != 16 or len(nonce) != 12:
+            raise ValueError("encryption salt or nonce has an invalid length")
+        if base64.b64encode(salt).decode("ascii") != encryption["salt"] or base64.b64encode(nonce).decode("ascii") != encryption["nonce"]:
+            raise ValueError("encryption salt and nonce must use canonical base64")
+
     # Ensure all extension values are representable in the canonical encoding.
     from .crypto import canonical_json
 
@@ -166,23 +201,36 @@ def _validate_rights(rights):
     return {name: rights.get(name, "unspecified") for name in RIGHTS}
 
 
-def create_document(payload, media_type=None, rights=None, private_key=None, creator=None, lineage=None):
+def create_document(payload, media_type=None, rights=None, private_key=None, creator=None, lineage=None, encryption_password=None):
     payload = bytes(payload)
     if private_key is None:
         raise ValueError("a signing key is required")
+    asset_id = str(uuid.uuid4())
+    media_type = media_type or "application/octet-stream"
+    normalized_rights = _validate_rights({} if rights is None else rights)
+    created_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     manifest = {
         "format": "NRAI",
         "version": 1,
-        "asset_id": str(uuid.uuid4()),
-        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-        "media_type": media_type or "application/octet-stream",
+        "asset_id": asset_id,
+        "created_at": created_at,
+        "media_type": media_type,
         "payload": {"length": len(payload), "sha256": hashlib.sha256(payload).hexdigest()},
-        "rights": _validate_rights({} if rights is None else rights),
+        "rights": normalized_rights,
     }
     if creator:
         manifest["creator"] = creator
     if lineage:
         manifest["lineage"] = lineage
+    if encryption_password is not None:
+        public_raw = private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        signer_public_key = base64.b64encode(public_raw).decode("ascii")
+        payload, encryption = encrypt_payload(payload, encryption_password, manifest, signer_public_key)
+        manifest["payload"] = {"length": len(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+        manifest["encryption"] = encryption
     return NraiDocument(sign_manifest(manifest, private_key), payload)
 
 
@@ -229,6 +277,17 @@ def verify_document(document, trusted_public_key=None):
     return verify_manifest(manifest, trusted_public_key)
 
 
+def decrypt_document(document, password, trusted_public_key=None):
+    """Verify, decrypt, and validate an encrypted NRAI payload."""
+    valid, reason = verify_document(document, trusted_public_key)
+    if not valid:
+        raise ValueError("Refusing to decrypt an invalid NRAI file: " + reason)
+    encryption = document.manifest.get("encryption")
+    if encryption is None:
+        return document.payload
+    return decrypt_payload(document.payload, encryption, password, document.manifest)
+
+
 def make_lineage(parent, operation):
     return {
         "parent_asset_id": parent.manifest.get("asset_id"),
@@ -268,7 +327,10 @@ def converted_payload(payload, target_format):
     return out.getvalue()
 
 
-def derive_document(parent, payload, media_type, private_key, operation):
+def derive_document(parent, payload, media_type, private_key, operation, encryption_password=None):
     rights = dict(parent.manifest.get("rights", {}))
     creator = parent.manifest.get("creator")
-    return create_document(payload, media_type, rights, private_key, creator, make_lineage(parent, operation))
+    return create_document(
+        payload, media_type, rights, private_key, creator,
+        make_lineage(parent, operation), encryption_password,
+    )

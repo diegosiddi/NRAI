@@ -1,9 +1,15 @@
-# NRAI Container Format 1.0
+# NRAI Container Format 1.1
 
-**Status:** stable format revision 1.0. Implementations that claim NRAI v1.0
-support must accept the framing and manifest rules below. Future incompatible
-changes require a new `version` value. The `1.0` label versions this
-specification; the manifest's integer `version` remains `1`.
+**Status:** stable format revision 1.1 for manifest version 1. The container
+framing and unencrypted representation are unchanged. This revision defines
+an optional encrypted-payload profile. Implementations that support the profile
+must follow section 3. Future incompatible format changes require a new
+manifest `version` value.
+
+Revision 1.1 defines an optional encrypted-payload profile for v1 containers.
+Unencrypted v1 files retain their exact prior representation. The profile is
+indicated by a signed top-level `encryption` descriptor; legacy readers can
+verify the signed ciphertext but cannot render it as an image.
 
 The recommended extension is `.nrai`. The project currently uses
 `application/vnd.nrai` as a provisional media-type label; it is not an IANA
@@ -70,7 +76,8 @@ date-time with whole-second precision and the exact form `YYYY-MM-DDTHH:MM:SSZ`.
 `media_type` is a syntactically valid type and
 subtype separated by `/`. `payload.length` is an unsigned 64-bit integer and
 must equal the exact number of payload bytes. `payload.sha256` is SHA-256 of
-those bytes, represented by exactly 64 lowercase hexadecimal characters.
+those bytes, represented by exactly 64 lowercase hexadecimal characters. For
+encrypted files, these refer to ciphertext bytes, including the AEAD tag.
 
 The six `rights` keys above are required in v1. Each value is exactly one of
 `allow`, `deny`, `ask`, or `unspecified`. Missing rights are not allowed and
@@ -93,7 +100,56 @@ manifest. They are covered by the signature. A reader must not assign meaning
 to an unknown field unless an applicable extension specification defines it.
 Unknown keys inside the v1 `rights` and `lineage` objects are invalid.
 
-## 3. Canonical JSON and signature
+## 3. Encrypted-payload profile
+
+An encrypted file has this additional signed top-level object:
+
+```json
+{
+  "encryption": {
+    "algorithm": "AES-256-GCM",
+    "kdf": "scrypt",
+    "salt": "base64 of 16 random bytes",
+    "nonce": "base64 of 12 random bytes",
+    "scrypt_n": 32768,
+    "scrypt_r": 8,
+    "scrypt_p": 1,
+    "plaintext_length": 12345,
+    "plaintext_sha256": "64 lowercase hexadecimal characters"
+  }
+}
+```
+
+The encryption descriptor has exactly these fields and values. The payload is
+AES-256-GCM ciphertext with its 16-byte authentication tag appended. A 32-byte
+key is derived from the UTF-8 passphrase and 16-byte random salt using scrypt
+with the parameters shown. The implementation requires a passphrase of at
+least 12 characters; users should choose a longer, unique passphrase. The
+12-byte nonce must be newly generated for each encryption operation. The AEAD
+associated data is `NRAI\0v1\0` followed by canonical JSON for an object with
+two fields: `metadata` and `signing_public_key`. `metadata` contains every
+manifest field except `payload`, `encryption`, and `signature`; the second field
+is the same base64 public key embedded in the Ed25519 signature descriptor.
+This binds the ciphertext to the rights and metadata and to the signing key.
+
+The signed payload descriptor hashes and counts the ciphertext. The signed
+encryption descriptor records the expected plaintext length and SHA-256 digest;
+after decryption, readers must verify both. A reader must verify the manifest
+signature and ciphertext digest before attempting decryption, then fail closed
+on an incorrect passphrase, invalid authentication tag, or plaintext digest
+mismatch. The passphrase and derived key are never stored in the file. The
+signature key and encryption passphrase serve different purposes.
+
+This profile uses a shared passphrase rather than recipient-specific key
+envelopes. Anyone who knows the passphrase can decrypt and copy the image. The
+salt and ciphertext permit offline passphrase guessing, so a weak passphrase is
+not safe. Losing the passphrase makes the image unrecoverable. Changing or
+revoking access requires re-encrypting the payload with a new passphrase and
+redistributing it. The rights manifest remains readable without the passphrase.
+Native file-browser thumbnail extensions in this prototype do not decrypt files
+and must suppress their thumbnails.
+
+## 4. Canonical JSON and signature
 
 To verify the signature:
 
@@ -113,7 +169,7 @@ embedded key permits integrity verification; it does not establish who owns
 the key. Applications need a separate trust store or other verified identity
 binding for that claim.
 
-## 4. Rights and derivatives
+## 5. Rights and derivatives
 
 Rights are signed declarations. NRAI does not itself enforce them. Compatible
 software should communicate and follow them, but arbitrary software, exports,
@@ -127,7 +183,7 @@ the signer of the new statement, not necessarily the original creator. Lineage
 is only available when the conversion tool records it; it is not guaranteed
 across unrelated software.
 
-## 5. Conformance vectors
+## 6. Conformance vectors
 
 The machine-readable catalog and binary fixtures in
 [`tests/vectors/v1/`](tests/vectors/v1/) define positive and negative v1.0

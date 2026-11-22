@@ -3,11 +3,75 @@
 import base64
 import hashlib
 import json
+import os
 from pathlib import Path
 
-from cryptography.exceptions import InvalidSignature
+from cryptography.exceptions import InvalidSignature, InvalidTag
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+
+SCRYPT_N = 32768
+SCRYPT_R = 8
+SCRYPT_P = 1
+
+
+def _derive_payload_key(password, salt, n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P):
+    if not isinstance(password, str) or len(password) < 12:
+        raise ValueError("Encryption passphrase must be at least 12 characters")
+    return Scrypt(salt=salt, length=32, n=n, r=r, p=p).derive(password.encode("utf-8"))
+
+
+def _payload_aad(manifest, signer_public_key):
+    bound_metadata = {
+        key: value for key, value in manifest.items()
+        if key not in {"payload", "encryption", "signature"}
+    }
+    binding = {"metadata": bound_metadata, "signing_public_key": signer_public_key}
+    return b"NRAI\x00v1\x00" + canonical_json(binding)
+
+
+def encrypt_payload(plaintext, password, manifest, signer_public_key):
+    """Encrypt payload bytes with password-derived AES-256-GCM key."""
+    plaintext = bytes(plaintext)
+    salt = os.urandom(16)
+    nonce = os.urandom(12)
+    key = _derive_payload_key(password, salt)
+    aad = _payload_aad(manifest, signer_public_key)
+    ciphertext = AESGCM(key).encrypt(nonce, plaintext, aad)
+    descriptor = {
+        "algorithm": "AES-256-GCM",
+        "kdf": "scrypt",
+        "salt": base64.b64encode(salt).decode("ascii"),
+        "nonce": base64.b64encode(nonce).decode("ascii"),
+        "scrypt_n": SCRYPT_N,
+        "scrypt_r": SCRYPT_R,
+        "scrypt_p": SCRYPT_P,
+        "plaintext_length": len(plaintext),
+        "plaintext_sha256": hashlib.sha256(plaintext).hexdigest(),
+    }
+    return ciphertext, descriptor
+
+
+def decrypt_payload(ciphertext, descriptor, password, manifest):
+    """Decrypt and authenticate a payload; bad passwords fail closed."""
+    try:
+        salt = base64.b64decode(descriptor["salt"], validate=True)
+        nonce = base64.b64decode(descriptor["nonce"], validate=True)
+        key = _derive_payload_key(
+            password, salt, descriptor["scrypt_n"], descriptor["scrypt_r"], descriptor["scrypt_p"]
+        )
+        signer_public_key = manifest["signature"]["public_key"]
+        aad = _payload_aad(manifest, signer_public_key)
+        plaintext = AESGCM(key).decrypt(nonce, bytes(ciphertext), aad)
+    except (InvalidTag, KeyError, TypeError, ValueError) as exc:
+        raise ValueError("Could not decrypt this NRAI file; check the passphrase and file integrity") from exc
+    if len(plaintext) != descriptor["plaintext_length"]:
+        raise ValueError("Decrypted NRAI payload length does not match its signed descriptor")
+    if hashlib.sha256(plaintext).hexdigest() != descriptor["plaintext_sha256"]:
+        raise ValueError("Decrypted NRAI payload digest does not match its signed descriptor")
+    return plaintext
 
 
 def canonical_json(value):

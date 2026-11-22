@@ -29,6 +29,18 @@ class ViewerTests(unittest.TestCase):
         self.assertEqual(loaded.manifest["rights"]["screenshot"], "deny")
         self.assertIn("signature valid", reason)
 
+    def test_viewer_decrypts_only_with_the_passphrase(self):
+        key = Ed25519PrivateKey.generate()
+        password = "a very long sample passphrase"
+        doc = create_document(tiny_png(), "image/png", {}, key, encryption_password=password)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "encrypted.nrai"
+            save_document(doc, path)
+            with self.assertRaisesRegex(ValueError, "Could not decrypt"):
+                load_verified_image(path, encryption_password="incorrect password")
+            _loaded, image, _reason = load_verified_image(path, encryption_password=password)
+        self.assertEqual(image.size, (3, 2))
+
     def test_viewer_refuses_payload_tampering(self):
         doc = create_document(tiny_png(), "image/png", {}, Ed25519PrivateKey.generate())
         with tempfile.TemporaryDirectory() as folder:

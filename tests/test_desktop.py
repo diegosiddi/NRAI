@@ -4,7 +4,7 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from nrai.container import RIGHTS, load_document, verify_document
+from nrai.container import RIGHTS, decrypt_document, load_document, verify_document
 from nrai.desktop import create_image_container
 
 
@@ -35,6 +35,20 @@ class DesktopCreatorTests(unittest.TestCase):
             source.write_bytes(b"image")
             with self.assertRaisesRegex(ValueError, "different from the source"):
                 create_image_container(source, source, {}, Ed25519PrivateKey.generate())
+
+    def test_creator_can_encrypt_the_original_image_bytes(self):
+        payload = b"private image bytes"
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "source.png"
+            output = Path(folder) / "protected.nrai"
+            source.write_bytes(payload)
+            created = create_image_container(
+                source, output, {}, Ed25519PrivateKey.generate(),
+                encryption_password="a long desktop passphrase",
+            )
+            loaded = load_document(output)
+        self.assertNotIn(payload, loaded.payload)
+        self.assertEqual(decrypt_document(loaded, "a long desktop passphrase"), payload)
 
     def test_creator_rejects_non_image_file(self):
         with tempfile.TemporaryDirectory() as folder:

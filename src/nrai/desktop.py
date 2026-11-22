@@ -57,7 +57,7 @@ def ensure_default_key():
     return private_path
 
 
-def create_image_container(image_path, output_path, rights, private_key, creator=""):
+def create_image_container(image_path, output_path, rights, private_key, creator="", encryption_password=None):
     """Wrap unchanged source image bytes in a signed NRAI file."""
     source = Path(image_path)
     target = Path(output_path)
@@ -69,7 +69,10 @@ def create_image_container(image_path, output_path, rights, private_key, creator
     if not mime_type.startswith("image/"):
         raise ValueError("The selected file type is not recognized as an image.")
     payload = source.read_bytes()
-    document = create_document(payload, mime_type, rights, private_key, creator.strip() or None)
+    document = create_document(
+        payload, mime_type, rights, private_key, creator.strip() or None,
+        encryption_password=encryption_password,
+    )
     save_document(document, target)
     return document
 
@@ -78,10 +81,13 @@ class NraiDesktopApp:
     def __init__(self, root):
         self.root = root
         self.root.title("NRAI Image Rights")
-        self.root.minsize(620, 660)
+        self.root.minsize(620, 740)
         self.source_path = tk.StringVar()
         self.output_path = tk.StringVar()
         self.creator = tk.StringVar()
+        self.encrypt_enabled = tk.BooleanVar(value=False)
+        self.encryption_password = tk.StringVar()
+        self.encryption_confirmation = tk.StringVar()
         self.status = tk.StringVar(value="Choose an image to get started.")
         self.rights = {name: tk.StringVar(value="unspecified") for name in RIGHTS}
 
@@ -117,7 +123,27 @@ class NraiDesktopApp:
         creator_frame.pack(fill="x", pady=(0, 12))
         ttk.Entry(creator_frame, textvariable=self.creator).pack(fill="x")
 
-        rights_frame = ttk.LabelFrame(outer, text="3. Rights manifest", padding=12)
+        encryption_frame = ttk.LabelFrame(outer, text="3. Optional file encryption", padding=12)
+        encryption_frame.pack(fill="x", pady=(0, 12))
+        ttk.Checkbutton(
+            encryption_frame,
+            text="Require a passphrase to view or export the image",
+            variable=self.encrypt_enabled,
+            command=self._toggle_encryption_fields,
+        ).pack(anchor="w")
+        ttk.Label(
+            encryption_frame,
+            text="Use a long, unique passphrase. Anyone you share it with can copy the image after opening it.",
+            wraplength=570,
+        ).pack(anchor="w", pady=(4, 8))
+        ttk.Label(encryption_frame, text="Passphrase").pack(anchor="w")
+        self.password_entry = ttk.Entry(encryption_frame, textvariable=self.encryption_password, show="•", state="disabled")
+        self.password_entry.pack(fill="x", pady=(0, 6))
+        ttk.Label(encryption_frame, text="Repeat passphrase").pack(anchor="w")
+        self.confirm_entry = ttk.Entry(encryption_frame, textvariable=self.encryption_confirmation, show="•", state="disabled")
+        self.confirm_entry.pack(fill="x")
+
+        rights_frame = ttk.LabelFrame(outer, text="4. Rights manifest", padding=12)
         rights_frame.pack(fill="both", expand=True, pady=(0, 12))
         ttk.Label(rights_frame, text="Choose a value for each use. Unspecified does not mean allowed.").grid(
             row=0, column=0, columnspan=2, sticky="w", pady=(0, 8)
@@ -135,7 +161,7 @@ class NraiDesktopApp:
             combo.set("unspecified")
         rights_frame.columnconfigure(1, weight=1)
 
-        output_frame = ttk.LabelFrame(outer, text="4. Save NRAI file", padding=12)
+        output_frame = ttk.LabelFrame(outer, text="5. Save NRAI file", padding=12)
         output_frame.pack(fill="x", pady=(0, 12))
         output_row = ttk.Frame(output_frame)
         output_row.pack(fill="x")
@@ -165,6 +191,11 @@ class NraiDesktopApp:
         self.output_path.set(str(Path(selected).with_suffix(".nrai")))
         self.status.set("Image selected. Choose rights and save the NRAI file.")
 
+    def _toggle_encryption_fields(self):
+        state = "normal" if self.encrypt_enabled.get() else "disabled"
+        self.password_entry.configure(state=state)
+        self.confirm_entry.configure(state=state)
+
     def choose_output(self):
         initial = self.output_path.get() or "image.nrai"
         selected = filedialog.asksaveasfilename(
@@ -192,8 +223,17 @@ class NraiDesktopApp:
         if not output:
             return
         choices = {name: value.get() for name, value in self.rights.items()}
+        password = None
+        if self.encrypt_enabled.get():
+            password = self.encryption_password.get()
+            if len(password) < 12:
+                messagebox.showinfo("Longer passphrase needed", "Use a passphrase with at least 12 characters.", parent=self.root)
+                return
+            if password != self.encryption_confirmation.get():
+                messagebox.showinfo("Passphrases do not match", "Enter the same passphrase twice.", parent=self.root)
+                return
         try:
-            create_image_container(source, output, choices, self.private_key, self.creator.get())
+            create_image_container(source, output, choices, self.private_key, self.creator.get(), password)
         except (OSError, ValueError, RuntimeError) as exc:
             messagebox.showerror("Could not create NRAI file", str(exc), parent=self.root)
             self.status.set("Could not create the file.")
@@ -201,7 +241,7 @@ class NraiDesktopApp:
         self.status.set("Created %s" % output)
         messagebox.showinfo(
             "NRAI file created",
-            "Saved the signed rights manifest and original image bytes to:\n%s" % output,
+            ("Saved the signed rights manifest and encrypted image payload to:\n%s" if password else "Saved the signed rights manifest and original image bytes to:\n%s") % output,
             parent=self.root,
         )
 

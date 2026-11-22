@@ -2,16 +2,17 @@
 
 NRAI is a prototype image container for carrying an unchanged source image byte stream alongside a signed, machine-readable rights manifest. It gives compatible software a common way to inspect rights, verify integrity, and record supported derivative operations.
 
-**NRAI is a declaration and interoperability prototype, not DRM.** A manifest cannot force an uncooperative program to honor it, stop an image from being copied, or guarantee that rights survive arbitrary edits, screenshots, re-encoding, or third-party conversion. The viewer and SDK demonstrate cooperative behavior only.
+**NRAI is a declaration and interoperability prototype, not DRM.** Unencrypted files carry signed rights declarations; optional encryption keeps the image payload unreadable without its passphrase. A recipient who can decrypt and display an image can still copy it, and a manifest cannot force uncooperative software to honor its rights declarations or guarantee that rights survive arbitrary edits, screenshots, re-encoding, or third-party conversion.
 
 ## What is included
 
-- Stable NRAI v1.0 container specification in [FORMAT.md](FORMAT.md), with binary positive and negative interoperability vectors.
+- NRAI v1 container specification, revision 1.1, in [FORMAT.md](FORMAT.md), with binary interoperability vectors and an optional encrypted-payload profile.
 - Python SDK and `nrai` CLI for key generation, creation, inspection, verification, export, and converted derivatives.
 - A cross-platform desktop app for importing an image, configuring all six rights, and creating a signed `.nrai` file.
-- A companion desktop viewer that verifies `.nrai` files, displays their images and rights, and reports the declared screenshot policy.
+- An optional encrypted-payload profile using AES-256-GCM with a passphrase-derived key, so removing the NRAI wrapper leaves ciphertext.
+- A companion desktop viewer that verifies `.nrai` files, requests a passphrase for encrypted images, displays their rights, and reports the declared screenshot policy.
 - Platform file-type registration assets for macOS, Windows, and Linux so compatible desktop environments can identify and open `.nrai` files.
-- Finder Quick Look and Windows Explorer thumbnail providers. Both verify the v1 manifest before decoding and suppress thumbnails for invalid files or `screenshot: deny`.
+- Finder Quick Look and Windows Explorer thumbnail providers. Both verify the v1 manifest before decoding and suppress thumbnails for invalid files, encrypted payloads, or `screenshot: deny`.
 - Android `FLAG_SECURE` integration sketch in [examples/android/ProtectedImageActivity.kt](examples/android/ProtectedImageActivity.kt).
 - Tests and a sample independently configured rights file.
 
@@ -35,9 +36,11 @@ Launch the creator with:
 nrai-desktop
 ```
 
-Choose an image, set each rights value, optionally enter a creator name, and choose where to save the `.nrai` file. The app creates an Ed25519 signing key on first launch in the current user's application-data directory and reuses it for future files. The private key stays on that computer and is not embedded in the NRAI file. Back it up securely if you need to sign future files with the same key; anyone who obtains it can sign as that key. The app also saves the matching public key next to it.
+Choose an image, set each rights value, optionally enter a creator name, and choose whether to encrypt the image with a passphrase. The image payload is encrypted before it is placed in the `.nrai` file; anyone who removes the wrapper without the passphrase gets ciphertext. Use a long, unique passphrase and share it only with intended viewers. Anyone who receives it can decrypt and copy the image, and losing it makes the image unrecoverable. Rights metadata remains readable without it.
 
-Launch **NRAI Viewer** to choose and inspect an existing `.nrai` file, or pass the path to `nrai-viewer`. The viewer checks the payload digest and signature before decoding the image, displays all six rights, and can optionally verify against a trusted public key. A valid signature without a trusted key confirms that the embedded key signed the manifest but does not identify its owner. Screenshot policy is displayed as a declaration; the viewer cannot block OS screenshots or screen recording.
+The app creates an Ed25519 signing key on first launch in the current user's application-data directory and reuses it for future files. The private signing key stays on that computer and is not embedded in the NRAI file. It is currently stored as an unencrypted PEM file, so protect access to your computer and back it up securely if you need to sign future files with the same key; anyone who obtains it can sign files as that key. This signing key is separate from the image-encryption passphrase.
+
+Launch **NRAI Viewer** to choose and inspect an existing `.nrai` file, or pass the path to `nrai-viewer`. The viewer checks the payload digest and signature before decoding the image and requests the passphrase for encrypted files. A valid signature without a trusted key confirms that the embedded key signed the manifest but does not identify its owner. Screenshot policy is displayed as a declaration; the viewer cannot block OS screenshots or screen recording.
 
 To build a native app for the current platform, install PyInstaller and run:
 
@@ -67,7 +70,7 @@ The desktop workflow builds and embeds this extension automatically. Its artifac
 - **Windows:** the desktop artifact includes the Explorer handler and install/uninstall scripts. After extracting the Viewer build to a stable folder, open PowerShell there and run `./install-nrai.ps1 -ViewerExe './NRAI Viewer.exe' -ThumbnailHandlerDll './NraiThumbnailHandler.dll'`. This registers the file association and Explorer thumbnail provider for the current user. Windows Settings remains the place to change the preferred app. Run `./uninstall-nrai.ps1` to remove the association and handler.
 - **Linux desktops using shared-mime-info:** install `platform/linux/application-x-nrai.xml` into the system or user MIME package directory and refresh the desktop MIME database. Install `platform/linux/nrai-viewer.desktop` and make it the preferred handler for `application/vnd.nrai`.
 
-The native extensions produce thumbnails, not an editable view of rights. They decline to create thumbnails when verification fails or `screenshot: deny` is present. This avoids creating new cached preview pixels for those files, but cannot erase existing caches, prevent screenshots of the full viewer, or enforce policy system-wide. The Linux metadata currently enables open-with integration; no Linux thumbnailer is included.
+The native extensions produce thumbnails, not an editable view of rights. They decline to create thumbnails when verification fails, `screenshot: deny` is present, or the payload is encrypted. This avoids creating new cached preview pixels for those files, but cannot erase existing caches, prevent screenshots of the full viewer, or enforce policy system-wide. The Linux metadata currently enables open-with integration; no Linux thumbnailer is included.
 
 ## Quick start
 
@@ -75,12 +78,13 @@ The native extensions produce thumbnails, not an editable view of rights. They d
 nrai keygen --private creator.private.pem --public creator.public.pem
 nrai create photo.jpg photo.nrai --private-key creator.private.pem \
   --rights examples/rights.json --creator 'Example creator'
+nrai create confidential.jpg confidential.nrai --private-key creator.private.pem --encrypt
 nrai inspect photo.nrai
 nrai verify photo.nrai --trusted-key creator.public.pem
 nrai-viewer photo.nrai
 ```
 
-`verify` checks the payload digest and Ed25519 signature. With `--trusted-key`, it also checks that the signer matches the supplied key. Without a trusted key, a valid signature proves only that the embedded key signed the manifest; it does not establish who controls that key.
+`verify` checks the payload digest and Ed25519 signature, including for encrypted files. With `--trusted-key`, it also checks that the signer matches the supplied key. Without a trusted key, a valid signature proves only that the embedded key signed the manifest; it does not establish who controls that key. `create --encrypt` prompts for a passphrase without echoing it. `export` prompts before decrypting encrypted files. Converting an encrypted file prompts for its current passphrase and carries encryption forward to the derivative.
 
 Convert to another image encoding while carrying rights into a newly signed NRAI file:
 
@@ -112,7 +116,9 @@ NRAI is designed to detect accidental corruption and communicate a creator's dec
 
 - Ed25519 signatures cover all manifest fields, including each rights choice and the SHA-256 digest and length of the exact payload bytes.
 - Signatures do not establish legal ownership or identity. Applications need an out-of-band trusted-key policy to associate a public key with a creator.
-- A recipient can remove the wrapper, copy pixels, alter content, or create a new file. Cryptographic verification will detect edits to an existing NRAI file, but cannot stop a determined user from making an unmarked copy.
+- Unencrypted NRAI payloads can be extracted directly. Encrypted payloads require the passphrase to recover the image after stripping, but any recipient who can decrypt and display the image can copy it. This passphrase profile does not provide per-recipient revocation, secure hardware playback, or screenshot prevention.
+- The passphrase is not stored in the file; losing it means losing access to the image. The signed rights manifest remains visible, and the stored salt/ciphertext allow offline guessing of weak passphrases.
+- Cryptographic verification detects edits to an existing NRAI file, but cannot stop a determined user from making an unmarked copy or a new file signed with their own key.
 - Derivative lineage is recorded only when a compatible tool performs the operation and signs the resulting container. It is not guaranteed across unrelated software.
 - A screenshot restriction is an instruction. Enforcement depends on a host platform's capture controls and application integration.
 - Rights declarations are not legal advice and do not themselves amend a license or contract.
@@ -124,11 +130,11 @@ python -m pip install '.[test]'
 python -m pytest
 ```
 
-The frozen interoperability vectors are in `tests/vectors/v1/`; regenerate them with `PYTHONPATH=src python scripts/build_conformance_vectors.py`. The Swift thumbnail verifier is tested against the same catalog on macOS CI. The Windows Explorer handler is compiled on Windows CI.
+The frozen interoperability vectors are in `tests/vectors/v1/`; regenerate them with `PYTHONPATH=src python scripts/build_conformance_vectors.py`. The Swift thumbnail verifier is tested against the same catalog on macOS CI. The Windows Explorer handler is compiled on Windows CI. Native thumbnails are deliberately unavailable for encrypted files.
 
 ## Repository status
 
-NRAI v1.0 is the frozen container revision specified in [FORMAT.md](FORMAT.md); the SDK and desktop apps remain prototype software. Treat incompatible changes as a new protocol version and do not silently reinterpret signed fields. `application/vnd.nrai` is currently a project media-type label, not an IANA registration.
+NRAI v1 remains the container revision specified in [FORMAT.md](FORMAT.md); revision 1.1 defines the optional encrypted-payload profile. The SDK and desktop apps remain prototype software. Treat incompatible changes as a new protocol version and do not silently reinterpret signed fields. `application/vnd.nrai` is currently a project media-type label, not an IANA registration.
 
 ## License
 
